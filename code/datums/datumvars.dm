@@ -47,6 +47,7 @@
 	if(!D)
 		return
 
+
 	var/islist = islist(D)
 	if (!islist && !istype(D))
 		return
@@ -61,7 +62,6 @@
 		type = D.type
 
 
-
 	if(istype(D, /atom))
 		var/atom/AT = D
 		if(AT.icon && AT.icon_state)
@@ -71,6 +71,9 @@
 			usr << browse_rsc(sprite, "vv[hash].png")
 
 	title = "[D] (\ref[D]) = [type]"
+
+	log_admin("[key_name(usr)] viewed variable [title].")
+	message_admins("[key_name(usr)] is viewing variable \ref[D], with an ID of [D].")
 
 	var/sprite_text
 	if(sprite)
