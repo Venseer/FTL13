@@ -12,9 +12,14 @@
 
 /obj/effect/landmark/dock_spawn/station
 	name = "ftldock_trade"
-	allowed_shuttles = AER_CARGO + SCARAB_CARGO + AER_FOB + SCARAB_FOB
+	allowed_shuttles = ALL_SHUTTLES
 	keep_hidden = FALSE
 	distance = 25
+
+/obj/effect/landmark/dock_spawn/station/internal
+	turf_type = /turf/open/floor/engine
+	baseturf_type = /turf/open/floor/engine
+	area_type = /area/no_entry
 
 /obj/effect/landmark/dock_spawn/main //unneded?
 	name = "ftldock_main"
@@ -22,12 +27,12 @@
 
 /obj/effect/landmark/dock_spawn/land
 	name = "ftldock_land"
-	allowed_shuttles = AER_FOB + SCARAB_FOB
+	allowed_shuttles = ALL_FOB
 	keep_hidden = FALSE
 	distance = 100
 
 /obj/effect/landmark/dock_spawn/board
 	name = "ftldock_board"
-	allowed_shuttles = AER_FOB + SCARAB_FOB
+	allowed_shuttles = ALL_SHUTTLES
 	keep_hidden = FALSE
 	distance = -25
