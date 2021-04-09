@@ -5,6 +5,7 @@
 	var/list/mob/dead/observer/candidates = list() //calling so we can decide is event is set or not
 	var/list/mob/dead/observer/selected_list = list()
 	var/list/mob/carbon/human/defenders_list = list()
+	var/list/beam_generators //For storing all beamgens
 	var/datum/planet/planet = null
 	var/shield_down = FALSE
 	var/detonation_timer = null //Timers for the nuke and shield
@@ -17,9 +18,11 @@
 	var/allocated_zlevel
 	var/shipname = null
 	var/datum/objective/ftl/boardship/mission_datum = null
+	var/datum/star_system/location
 
 /datum/round_event/ghost_role/boarding/New()
 	max_allowed = 3 + round(GLOB.player_list.len*0.1)
+	beam_generators = list()
 	return
 
 /datum/round_event/ghost_role/boarding/proc/check_role()
@@ -90,6 +93,8 @@
 		if(mission_datum)
 			minor_announce("[shipname]'s Blackbox Recorder has been looted.","Ship sensor automatic announcement")
 			mission_datum.boarding_progress = BOARDING_MISSION_SUCCESS
+			mission_datum.update_system_label(FALSE,location.objective)
+			check_ship_objectives()
 		else
 			minor_announce("Confirmed. [shipname]'s Self-Destruct Mechanism has been disarmed.","Ship sensor automatic announcement")
 		victorious = TRUE
@@ -99,6 +104,9 @@
 	if(victorious)
 		return 0
 	minor_announce("CRITICAL WARNING! [shipname]'s Self-Destruct Mechanism has been detonated near our current location!","Ship sensor automatic announcement")
+	if(mission_datum)
+		mission_datum.update_system_label(FALSE,location.objective)
+		check_ship_objectives()
 /*	for(var/obj/docking_port/stationary/D in SSstarmap.current_planet.docks) //This old code did some boring shit. Moving the ship away from the nuke with no consequences wasn't very *fun*
 		if(D.z != zlevel)
 			continue

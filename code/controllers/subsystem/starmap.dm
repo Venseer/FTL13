@@ -48,6 +48,8 @@ SUBSYSTEM_DEF(starmap)
 	var/planet_loaded = FALSE
 
 	var/dolos_entry_sound = 'sound/ambience/THUNDERDOME.ogg' //FTL last stand would also work
+	
+	var/endgame = FALSE
 
 /datum/controller/subsystem/starmap/Initialize(timeofday)
 	var/list/resources = subtypesof(/datum/star_resource)
@@ -89,7 +91,6 @@ SUBSYSTEM_DEF(starmap)
 		var/territory_to_expand = pick("syndicate", "solgov", "nanotrasen")
 		var/datum/star_system/system_closest_to_territory = null
 		var/system_closest_to_territory_dist = 100000
-		var/datum/star_system/capital = null
 		// Not exactly a fast algorithm, but it works. Besides, there's only a hundered star systems, it's not gonna cause much lag.
 		for(var/datum/star_system/E in star_systems)
 			if(E.alignment != "unaligned")
@@ -98,8 +99,6 @@ SUBSYSTEM_DEF(starmap)
 			for(var/datum/star_system/C in star_systems)
 				if(C.alignment != territory_to_expand)
 					continue
-				if(C.capital_planet)
-					capital = C
 				var/dist = E.dist(C)
 				closest_in_dist = min(dist, closest_in_dist)
 			if(closest_in_dist < system_closest_to_territory_dist)
@@ -107,7 +106,7 @@ SUBSYSTEM_DEF(starmap)
 				system_closest_to_territory = E
 		if(system_closest_to_territory)
 			system_closest_to_territory.alignment = territory_to_expand
-			system_closest_to_territory.danger_level = max(1, max(1,round((50 - system_closest_to_territory.dist(capital)) / 8)))
+			system_closest_to_territory.danger_level = rand(2,4) //max(1, max(1,round((50 - system_closest_to_territory.dist(capital)) / 8))) //As cool as this was, jumping into 5+ ships was round over
 
 			var/datum/star_faction/faction = SSship.cname2faction(system_closest_to_territory.alignment)
 			faction.systems += system_closest_to_territory
@@ -127,6 +126,7 @@ SUBSYSTEM_DEF(starmap)
 /datum/controller/subsystem/starmap/fire()
 	if(is_loading == FTL_LOADING && world.time >= to_time)
 		to_time += 100
+		ftl_message("<font color=red>Error in bluespace-pathfinding algorithms, attempting to calibrate, expect a delay of 10 seconds...</font>")
 
 	if(in_transit || in_transit_planet)
 		if(is_loading == FTL_NOT_LOADING && world.time >= from_time + 50)
@@ -142,9 +142,14 @@ SUBSYSTEM_DEF(starmap)
 				current_planet = current_system.planets[1]
 			else if(in_transit_planet)
 				current_planet = to_planet
-			if(current_system.name == "Dolos") //Syndie cap
+			if(istype(current_system,/datum/star_system/capital/syndicate)) //Syndie cap
+				log_admin("The ship has just arrived at Dolos!")
 				message_admins("The ship has just arrived at Dolos!")
+				SSast.send_discord_message("admin","The ship just jumped to Dolos. ~~come grab some popcorn~~","round ending event")
 				ftl_sound(dolos_entry_sound,30)
+			if(current_system.system_traits & SYSTEM_DANGEROUS && SSship.ship_combat_log_spam) //Is the system an automuter and is the logspam still on?
+				SSship.ship_combat_log_spam = FALSE
+				message_admins("Combat log spam was disabled due to arriving at a dangerous system.")
 			ftl_sound('sound/effects/hyperspace_end.ogg')
 			ftl_parallax(FALSE)
 			SSmapping.fake_ftl_change(FALSE)
@@ -162,28 +167,8 @@ SUBSYSTEM_DEF(starmap)
 			in_transit_planet = FALSE
 			is_loading = FTL_NOT_LOADING
 
-	// Check and update ship objectives
-	var/objectives_complete = 1
-	for(var/datum/objective/O in ship_objectives)
-		if((O.type == /datum/objective/ftl/gohome) || (!O.failed && !O.check_completion() && !O.failed))
-			objectives_complete = 0
+			addtimer(CALLBACK(src,/proc/check_ship_objectives), 75)
 
-	if(objectives_complete)
-		// Make a new objective
-		var/datum/objective/O
-
-		if(objective_types.len && world.time < 54000)
-			var/objectivetype = pickweight(objective_types)
-			objective_types[objectivetype]--
-			if(objective_types[objectivetype] <= 0)
-				objective_types -= objectivetype
-			O = new objectivetype
-		else
-			O = new /datum/objective/ftl/gohome
-
-		O.find_target()
-		ship_objectives += O
-		priority_announce("Ship objectives updated. Please check a communications console for details.", null, null)
 
 /datum/controller/subsystem/starmap/proc/get_transit_progress()
 	if(!in_transit && !in_transit_planet)
@@ -217,13 +202,23 @@ SUBSYSTEM_DEF(starmap)
 		return 1
 	if(ftl_is_spooling)
 		return 1
+	ftl_message("<span class=notice>FTL Drive attempting jump to [target.name], a [target.alignment] system. \
+		[ftl_drive.jump_speed == initial(ftl_drive.jump_speed) ? "" : " FTL drive upgrades report a speed of [1/ftl_drive.jump_speed] times faster travel."] \
+		[ftl_drive.jump_max == initial(ftl_drive.jump_max) ? "" : " Jump range increased by [ftl_drive.jump_max - initial(ftl_drive.jump_max)] light years."] \
+		</span>")
+	spawn(30)
+		ftl_message("<span class=notice>Calculations indicate that we should arrive at our destination in roughly [((1850 * ftl_drive.jump_speed) + 600) / 10] seconds, and we should be in FTL for [(1850 * ftl_drive.jump_speed) / 10] seconds.</span>")
+	addtimer(CALLBACK(src, .proc/jumping_out_message), (1850 * ftl_drive.jump_speed) + 550)
 	if(!spool_up(admin_forced)) return
 	from_system = current_system
 	from_time = world.time + 40
 	to_system = target
-	if(to_system.name == "Dolos") //Syndie cap
+	if(istype(to_system,/datum/star_system/capital/syndicate)) //Syndie cap
 		message_admins("The ship has just started a jump to Dolos!!")
-	to_time = world.time + 1850
+	if(current_system.system_traits & SYSTEM_DANGEROUS && !SSship.ship_combat_log_spam) //is the system an automuter and were logs muted?
+		SSship.ship_combat_log_spam = TRUE //If the logs getting turned on again after an admin turned them off is annoying it can be fixed.
+		message_admins("Combat log spam was reenabled after leaving a dangerous system.")
+	to_time = world.time + (1850 * ftl_drive.jump_speed)
 	current_system = null
 	in_transit = 1
 	mode = null
@@ -247,6 +242,9 @@ SUBSYSTEM_DEF(starmap)
 
 	return 0
 
+/datum/controller/subsystem/starmap/proc/jumping_out_message()
+	ftl_message("<span class=notice>Computer calculations indicate that we should have left FTL or should leave FTL in a very short amount of time.</span>")
+
 /datum/controller/subsystem/starmap/proc/jump_planet(var/datum/planet/target,var/admin_forced)
 	if(!admin_forced) //If this was a forced jump, they can bypass range/plasma/do we even have a drive checks
 		if(!ftl_drive || !ftl_drive.can_jump_planet())
@@ -261,7 +259,7 @@ SUBSYSTEM_DEF(starmap)
 	from_planet = current_planet
 	from_time = world.time + 40
 	to_planet = target
-	to_time = world.time + 950 // Oh god, this is some serous jump time.
+	to_time = world.time + (950 * ftl_drive.jump_speed) // Oh god, this is some serous jump time. Not if you upgrade the FTL drive!
 	current_planet = null
 	in_transit_planet = 1
 	mode = null
@@ -629,3 +627,40 @@ SUBSYSTEM_DEF(starmap)
 	sleep(70) //godspeed (want it to line up with the actual jump animation and such
 	ftl_is_spooling = 0
 	return 1
+
+/datum/controller/subsystem/starmap/proc/activate_ENDGAME()
+	message_admins("ENDGAME HAS BEEN ACTIVATED")
+	ship_objectives = list() //This mission is the most important
+	objective_types = list() //Prevent new objectives
+	//create search station objective 
+	for(var/s in star_systems) //clear all the old objective markers
+		var/datum/star_system/sys = s
+		sys.objective = FALSE
+	var/datum/objective/ftl/customobjective/CO = new /datum/objective/ftl/customobjective
+	var/searching = TRUE
+	var/datum/star_system/system
+	var/datum/planet/planet
+	while(searching)
+		system = pick(SSstarmap.star_systems)
+		if(system.alignment == "nanotrasen" && system.capital_planet == 0 && system.primary_station) //Looking for an NT system that isn't the capital and has a station
+			searching = FALSE
+			planet = system.primary_station.planet
+			planet.objective = TRUE
+			system.objective = TRUE
+			message_admins("The research station is located at [planet]")
+			for(var/i = 1, planet.map_names.len, i++)
+				message_admins("[i]")
+				if(planet.map_names[i] == "stationnew.dmm")
+					planet.map_names[i] = "research_station.dmm"
+					message_admins("station set")
+					break
+	system.objective = 1				
+	CO.explanation_text = "The research station Space Station 13, located at [planet] was supposed to deliver an update on their progress for a key component of Operation Endgame. We have not heard anything for two hours. Due to the critical nature of this operation, we need you to check in on the station."
+	
+	var/datum/objective/ftl/boardship/endgame/EG = new /datum/objective/ftl/boardship/endgame
+	EG.find_target()
+	EG.explanation_text = "Report situation at Space Station 13 back to CC." 
+	
+	ship_objectives += CO
+	ship_objectives += EG
+

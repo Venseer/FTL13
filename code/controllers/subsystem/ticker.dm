@@ -246,6 +246,9 @@ SUBSYSTEM_DEF(ticker)
 		//Deleting Startpoints but we need the ai point to AI-ize people later
 		if(S.name != "AI")
 			qdel(S)
+	for(var/i = 1 to config.objective_count)
+		generate_ship_objective()
+
 
 	var/list/adm = get_admin_counts()
 	var/list/allmins = adm["present"]
@@ -551,18 +554,22 @@ SUBSYSTEM_DEF(ticker)
 	// Declare ship objectives
 	to_chat(world, "<br><FONT size=3><B>The ship objectives were:</B></FONT>")
 	var/count = 1
-	var/redtext = 0
-	for(var/datum/objective/objective in SSstarmap.ship_objectives)
-		if(objective.check_completion() && !objective.failed)
-			to_chat(world, "<br><b>Objective #[count]</b>: [objective.explanation_text] <span class='greenannounce'>Success!</span>")
+	var/redtext = FALSE
+	if(!locate(/datum/objective/ftl/gohome) in get_ship_objectives())
+		redtext = TRUE
+	for(var/datum/objective/objective in get_ship_objectives())
+		if(objective.type == /datum/objective/ftl/gohome && !objective.check_completion())
+			to_chat(world, "<br><b>Objective #[count]</b>: [objective.explanation_text] <span class='boldannounce'>Failed.</span>")
+			redtext = TRUE
+		else if(objective.check_completion() && !objective.failed)
+			to_chat(world, "<br><b>Objective #[count]</b>: [objective.explanation_text] <span class='greenannounce'>Completed!</span>")
 		else
-			to_chat(world, "<br><b>Objective #[count]</b>: [objective.explanation_text] <span class='boldannounce'>Fail.</span>")
-			redtext = 1
+			to_chat(world, "<br><b>Objective #[count]</b>: [objective.explanation_text] <span class='boldannounce'>Failed.</span>")
 		count++
 	if(redtext)
 		to_chat(world, "<br><b><span class='boldannounce'>The ship has failed.</span></b>")
 	else
-		to_chat(world, "<br><b><span class='greenannounce'>The ship was successful.</span></b>")
+		to_chat(world, "<br><b><span class='greenannounce'>The ship has returned safely!</span></b>")
 
 	//calls auto_declare_completion_* for all modes
 	for(var/handler in typesof(/datum/game_mode/proc))
@@ -597,7 +604,7 @@ SUBSYSTEM_DEF(ticker)
 
 	CHECK_TICK
 
-	mode.declare_station_goal_completion()
+	//mode.declare_station_goal_completion() Not really needed in FTL13
 
 	CHECK_TICK
 	//medals, placed far down so that people can actually see the commendations.
@@ -620,6 +627,7 @@ SUBSYSTEM_DEF(ticker)
 
 /datum/controller/subsystem/ticker/proc/send_tip_of_the_round()
 	var/m
+	var/m_ftl
 	if(selected_tip)
 		m = selected_tip
 	else
@@ -631,8 +639,18 @@ SUBSYSTEM_DEF(ticker)
 			m = pick(memetips)
 
 	if(m)
-		to_chat(world, "<font color='purple'><b>Tip of the round: </b>[rhtml_encode(m)]</font>")
-
+		to_chat(world, "<font color='purple'><b>Tips of the round: </b>[rhtml_encode(m)]</font>")
+		
+	var/list/ftl_randomtips = world.file2list("strings/ftl_tips.txt")
+	var/list/ftl_memetips = world.file2list("strings/ftl_sillytips.txt")
+	if(ftl_randomtips.len && prob(95))
+		m_ftl = pick(ftl_randomtips)
+	else if(ftl_memetips.len)
+		m_ftl = pick(ftl_memetips)
+		
+	if(m_ftl)
+		to_chat(world, "<font color='purple'><b>Tip 2: </b>[rhtml_encode(m_ftl)]</font>")
+		
 /datum/controller/subsystem/ticker/proc/check_queue()
 	if(!queued_players.len || !config.hard_popcap)
 		return

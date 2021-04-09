@@ -10,7 +10,9 @@
 	var/datum/starship/forced_boarding //Used to force only one ship to be boardable at 100% chance
 
 	var/danger_level = 0
+	var/system_traits = NONE
 	var/capital_planet = 0
+	var/objective = FALSE
 
 	var/PathNode/PNode = null //for pathfinding
 
@@ -87,6 +89,7 @@
 	var/resource_type
 	var/nav_icon_name = "gas"
 	var/no_unload_reason = ""
+	var/objective = FALSE
 
 
 /datum/planet/New(p_system)
@@ -305,6 +308,7 @@
 	x = 28
 	y = 70
 	alignment = "syndicate"
+	system_traits = SYSTEM_DANGEROUS
 
 /datum/star_system/capital/generate()
 	if(!name)

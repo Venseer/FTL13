@@ -6,7 +6,7 @@
 
 	var/hull_integrity = 0
 	var/shield_strength = 0
-	var/evasion_chance = 0
+	var/hit_chance = 1
 
 	var/repair_time = 0 // same as fire rate
 	var/recharge_rate = 0 // shield points per second
@@ -213,7 +213,8 @@ GLOBAL_VAR(next_ship_id)
 	var/x_loc = 0 //(1,1) is top left
 	var/y_loc = 0
 
-	var/active = 1
+	var/active = TRUE //For component health
+	var/online = TRUE //For EMP attacks
 	var/datum/starship/ship
 
 	var/datum/ship_attack/attack_data = null
@@ -224,6 +225,10 @@ GLOBAL_VAR(next_ship_id)
 	if(attack_data)
 		attack_data = new attack_data
 		attack_data.our_ship_component = src
+
+/datum/ship_component/proc/getstatus()
+	if(active && online) return TRUE
+	else return FALSE
 
 /datum/ship_component/cockpit
 	name = "bridge"
@@ -282,34 +287,37 @@ GLOBAL_VAR(next_ship_id)
 
 	alt_image = "weapon"
 
-/datum/ship_component/weapon/proc/attack_effect(var/turf/T)
-	new /obj/effect/temp_visual/ship_target(T, attack_data)
-
 /datum/ship_component/weapon/random
 	name = "standard mount"
 	cname = "r_weapon"
 	fire_rate = 300
 
-	var/list/possible_weapons = list(/datum/ship_attack/laser,/datum/ship_attack/ballistic,/datum/ship_attack/chaingun)
+	var/list/possible_weapons = list(/datum/ship_attack/laser = 1,/datum/ship_attack/ballistic = 1,/datum/ship_attack/chaingun = 1)
 
 /datum/ship_component/weapon/random/New()
-		attack_data = pick(possible_weapons)
+		attack_data = pickweight(possible_weapons)
 		attack_data = new attack_data
 		name = attack_data.cname
+
+/datum/ship_component/weapon/random/laser
+	name = "random laser mount"
+	cname = "r_weapon_laser"
+
+	possible_weapons = list(/datum/ship_attack/laser = 5,/datum/ship_attack/laser/focused = 3,/datum/ship_attack/laser/burst = 3,/datum/ship_attack/laser/heavy = 3,/datum/ship_attack/laser/gatling = 1)
 
 /datum/ship_component/weapon/random/special
 	name = "special mount"
 	cname = "s_weapon"
 	fire_rate = 300
 
-	possible_weapons = list(/datum/ship_attack/ion,/datum/ship_attack/stun_bomb,/datum/ship_attack/flame_bomb)
+	possible_weapons = list(/datum/ship_attack/ion = 1,/datum/ship_attack/stun_bomb = 1,/datum/ship_attack/flame_bomb = 1,/datum/ship_attack/chem_bomb = 1)
 
 /datum/ship_component/weapon/random/memegun
 	name = "meme weapon"
 	cname = "meme_weapon"
 	fire_rate = 100
 
-	possible_weapons = list(/datum/ship_attack/slipstorm,/datum/ship_attack/honkerblaster,/datum/ship_attack/bananabomb,/datum/ship_attack/vape_bomb,/datum/ship_attack/carrier_weapon/catgirl)
+	possible_weapons = list(/datum/ship_attack/slipstorm = 2,/datum/ship_attack/honkerblaster = 2,/datum/ship_attack/bananabomb = 2,/datum/ship_attack/vape_bomb = 2,/datum/ship_attack/carrier_weapon/catgirl = 1)
 
 
 		//Phase Cannons
@@ -418,11 +426,34 @@ GLOBAL_VAR(next_ship_id)
 	attack_data = /datum/ship_attack/stun_bomb
 
 /datum/ship_component/weapon/fast_stunbomb
-	name = "fast chaingun"
+	name = "fast stunbomber"
 	cname = "fast_stunbomber"
 	fire_rate = 150
 
 	attack_data = /datum/ship_attack/stun_bomb
+
+
+			//Chemical Bombs
+/datum/ship_component/weapon/chembomb
+	name = "chembomber"
+	cname = "chembomber"
+	fire_rate = 300
+
+	attack_data = /datum/ship_attack/chem_bomb
+
+/datum/ship_component/weapon/slow_chembomb
+	name = "slow chembomber"
+	cname = "slow_chembomber"
+	fire_rate = 450
+
+	attack_data = /datum/ship_attack/chem_bomb
+
+/datum/ship_component/weapon/fast_chembomb
+	name = "fast chembomber"
+	cname = "fast_chembomber"
+	fire_rate = 150
+
+	attack_data = /datum/ship_attack/chem_bomb
 
 
 			//Chainguns
@@ -469,13 +500,13 @@ GLOBAL_VAR(next_ship_id)
 
 	fire_rate = 500
 
-/datum/ship_component/weapon/unknown_ship_weapon/attack_effect(var/turf/T) //10 shots, 7 spread
-	var/turf/target_sub
-	new /obj/effect/temp_visual/ship_target(T, attack_data) //Initial hit
-	for(var/I = 1 to 10) //Loop for each fragment
-		spawn(attack_data.warning_time+I)//Saves spamming many audio queues at once
-			target_sub = locate(T.x + rand(-7,7),T.y + rand(-7,7), T.z)
-			new /obj/effect/temp_visual/ship_target(target_sub, attack_data)
+/datum/ship_component/weapon/pirate_boarding_pod
+	name = "pirate boarding pod"
+	cname = "pirate_boarding_pod"
+	fire_rate = 200
+
+	attack_data = /datum/ship_attack/carrier_weapon/pirate_boarding_pod
+
 
 // AI MODULES
 
